@@ -66,4 +66,4 @@ Locally, run `pip install -r requirements.txt`, then run each script with `pytho
 
 If you use this code, please cite the thesis: Aliyu, A. U. (2026). *An Explainable Machine Learning Approach to Water Potability Prediction* [M.Tech. thesis]. Mewar University.
 
-Licence: add one here (for example MIT) before making the repository public.
+Licence: MIT. see the [LICENSE](LICENSE) file
