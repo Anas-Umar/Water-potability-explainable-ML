@@ -46,7 +46,7 @@ In Google Colab:
 
 ```
 !pip install -r requirements.txt
-%cd /content/drive/MyDrive        *or any folder holding the scripts and water_potability.csv*
+%cd /content/drive/MyDrive        #or any folder holding the scripts and water_potability.csv
 %run water_potability_full_analysis_v2.py
 %run supplementary_eda_and_importance.py
 %run regenerate_themed_plots.py
