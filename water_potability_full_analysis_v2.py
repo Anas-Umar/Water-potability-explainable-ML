@@ -8,7 +8,8 @@
 #   2. Leakage-free preprocessing: median imputation is fit on training data
 #      only (inside a Pipeline for cross-validation, and on X_train only for
 #      the held-out test evaluation).
-#   3. Random Forest and XGBoost: 5-fold cross-validation, test-set metrics,
+#   3. Random Forest and XGBoost: 5-fold cross-validation on the training set,
+#      held-out test-set metrics,
 #      confusion matrices, ROC curves, and a side-by-side comparison.
 #   4. SHAP explanations for the model with the higher cross-validated ROC-AUC.
 #
@@ -167,13 +168,14 @@ rf_pipeline = Pipeline([
     ('imputer', SimpleImputer(strategy='median')),
     ('model', RandomForestClassifier(n_estimators=300, class_weight='balanced', random_state=RANDOM_STATE))
 ])
-rf_cv = cross_validate(rf_pipeline, X, y, cv=skf, scoring=scoring)
+# Cross-validation uses the TRAINING set only; the test set is touched once, at the end.
+rf_cv = cross_validate(rf_pipeline, X_train, y_train, cv=skf, scoring=scoring)
 rf_pipeline.fit(X_train, y_train)  # imputer fit on X_train only
 rf_preds = rf_pipeline.predict(X_test)
 rf_proba = rf_pipeline.predict_proba(X_test)[:, 1]
 rf_cm = confusion_matrix(y_test, rf_preds)
 
-print("\n--- Random Forest: 5-fold CV (leakage-free) ---")
+print("\n--- Random Forest: 5-fold CV on training set (leakage-free) ---")
 for m in scoring:
     print(f"  {m}: {rf_cv['test_'+m].mean():.3f} +/- {rf_cv['test_'+m].std():.3f}")
 print("\n--- Random Forest: Test set ---")
@@ -220,13 +222,13 @@ xgb_pipeline = Pipeline([
         random_state=RANDOM_STATE, eval_metric='logloss'
     ))
 ])
-xgb_cv = cross_validate(xgb_pipeline, X, y, cv=skf, scoring=scoring)
+xgb_cv = cross_validate(xgb_pipeline, X_train, y_train, cv=skf, scoring=scoring)
 xgb_pipeline.fit(X_train, y_train)  # imputer fit on X_train only
 xgb_preds = xgb_pipeline.predict(X_test)
 xgb_proba = xgb_pipeline.predict_proba(X_test)[:, 1]
 xgb_cm = confusion_matrix(y_test, xgb_preds)
 
-print("\n--- XGBoost: 5-fold CV (leakage-free) ---")
+print("\n--- XGBoost: 5-fold CV on training set (leakage-free) ---")
 for m in scoring:
     print(f"  {m}: {xgb_cv['test_'+m].mean():.3f} +/- {xgb_cv['test_'+m].std():.3f}")
 print("\n--- XGBoost: Test set ---")
