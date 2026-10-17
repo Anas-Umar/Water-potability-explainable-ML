@@ -3,7 +3,7 @@
 
 This code accompanies the M.Tech. thesis *An Explainable Machine Learning Approach to Water Potability Prediction* by Anas Umar Aliyu Mewar University, India.
 
-The code trains Random Forest and XGBoost classifiers on Water Potability dataset, compares them, and explains the Random Forest model with SHAP, permutation importance and native feature importance.
+The code trains Random Forest and XGBoost classifiers on Water Potability dataset, compares them and explains the Random Forest model with SHAP, permutation importance and native feature importance.
 Preprocessing is leakage-free: median imputation sits inside a scikit-learn `Pipeline`, so it is fit on training data only.
 
 ## Data
@@ -12,7 +12,7 @@ The dataset is not included in this repository. Download `water_potability.csv` 
 
 https://www.kaggle.com/datasets/adityakadiwal/water-potability
 
-The dataset has 3,276 samples, 9 physicochemical parameters, and a binary `Potability` label (0,1). Its original collection method is not documented (see **Chaper 3** of the thesis).
+The dataset has 3,276 samples, 9 physicochemical parameters, and a binary `Potability` label (0,1). Its original collection method is not documented (see **Chapter 3** of the thesis).
 
 ## Scripts
 
@@ -57,7 +57,7 @@ Locally, run `pip install -r requirements.txt`, then run each script with `pytho
 ## Reproducibility
 
 - Fixed random seed: `random_state = 42` for the train/test split, the cross-validation folds, and both classifiers.
-- Split: 80/20, stratified. Cross-validation: 5-fold, stratified.
+- Split: 80/20, stratified. Cross-validation: 5-fold, stratified, run on the training set only.
 - Imputation: median, inside a `Pipeline`, refit on the training portion only.
 - Environment used for the thesis results: Python 3.13.16, pandas 2.2.3, numpy 2.1.3, scikit-learn 1.6.1, xgboost 3.4.1, shap 0.52.0, matplotlib 3.10.0, seaborn 0.13.2 (Google Colab).
 - Other library versions may give slightly different numbers, especially for XGBoost and SHAP.
