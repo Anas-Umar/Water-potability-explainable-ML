@@ -1,5 +1,5 @@
 [README.md](https://github.com/user-attachments/files/33418171/README.md)
-# Explainable Machine Learning for Water Potability Prediction
+# Explainable Machine Learning for Water Potability Prediction [![DOI](https://zenodo.org/badge/1418388413.svg)](https://doi.org/10.5281/zenodo.23495833)
 
 This code accompanies the M.Tech. thesis *An Explainable Machine Learning Approach to Water Potability Prediction* by Anas Umar Aliyu Mewar University, India.
 
@@ -70,3 +70,5 @@ Locally, run `pip install -r requirements.txt`, then run each script with `pytho
 If you use this code, please cite the thesis: Aliyu, A. U. (2026). *An Explainable Machine Learning Approach to Water Potability Prediction* [M.Tech. thesis]. Mewar University.
 
 Licence: MIT. see the [LICENSE](LICENSE) file
+
+[![DOI](https://zenodo.org/badge/1418388413.svg)](https://doi.org/10.5281/zenodo.23495833)
