@@ -90,7 +90,7 @@ Locally, run `pip install -r requirements.txt`, then run each script with `pytho
 - Split: 80/20, stratified. Cross-validation: 5-fold, stratified, run on the training set only.
 - Imputation: median, inside a `Pipeline`, refit on the training portion only.
 - Paper analyses: 2,000 bootstrap resamples of the test set and 200 label shuffles.
-- Environment used for the results: Python 3.13.16, pandas 2.2.3, numpy 2.1.3, scikit-learn 1.6.1, xgboost 3.4.1, shap 0.52.0, matplotlib 3.10.0, seaborn 0.13.2, scipy [version], pillow [version] (Google Colab). Each paper script prints its environment at the end.
+- Environment used for the results: Python 3.13.16, pandas 2.2.3, numpy 2.1.3, scikit-learn 1.6.1, xgboost 3.4.1, shap 0.52.0, matplotlib 3.10.0, seaborn 0.13.2, scipy 1.16.3, pillow 11.3.0 (Google Colab). Each paper script prints its environment at the end.
 - Other library versions may give slightly different numbers, especially for XGBoost and SHAP.
 
 ## Citation and licence
