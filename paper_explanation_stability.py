@@ -89,11 +89,12 @@ def curvature(x, s):
 
 
 rank_rows, u_rows, agree_rows = [], [], []
-main_store = {}   # SHAP values and imputed test data for the main split (seed 42)
+main_store = {}   # SHAP values, imputed test data, and observed-value masks for the main split
 for seed in SEEDS:
     X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, stratify=y, random_state=seed)
     imputer = SimpleImputer(strategy='median').fit(X_tr)
-    X_te_imp = pd.DataFrame(imputer.transform(X_te), columns=FEATURES)
+    X_te_imp = pd.DataFrame(imputer.transform(X_te), columns=FEATURES, index=X_te.index)
+    X_te_observed = X_te.notna()
     fitted = {
         'Random Forest': Pipeline([('imputer', SimpleImputer(strategy='median')),
                                    ('model', RandomForestClassifier(n_estimators=300, class_weight='balanced',
@@ -108,7 +109,7 @@ for seed in SEEDS:
         pipe.fit(X_tr, y_tr)
         sv = class1_shap(pipe.named_steps['model'], X_te_imp)
         if seed == SEED:
-            main_store[name] = (sv, X_te_imp.copy())
+            main_store[name] = (sv, X_te_imp.copy(), X_te_observed.copy())
         mean_abs = pd.Series(np.abs(sv).mean(axis=0), index=FEATURES)
         share = mean_abs / mean_abs.sum() * 100
         rk = share.rank(ascending=False)
@@ -117,13 +118,18 @@ for seed in SEEDS:
             rank_rows.append({'Split seed': seed, 'Model': name, 'Feature': f,
                               'Share of total (%)': share[f], 'Rank': rk[f]})
         for f, expected in EXPECTED.items():
-            x = X_te_imp[f].to_numpy()
-            s = sv[:, FEATURES.index(f)]
+            # Missing feature values were median-imputed for model fitting and SHAP,
+            # but are excluded from the feature-response shape analysis: an imputed
+            # median is not an observed measurement of this feature.
+            observed_mask = X_te_observed[f].to_numpy()
+            x = X_te_imp.loc[observed_mask, f].to_numpy()
+            s = sv[observed_mask, FEATURES.index(f)]
             a2, dr2 = curvature(x, s)
             lo, hi = np.quantile(x, [TRIM, 1 - TRIM])
             keep = (x >= lo) & (x <= hi)
             a2_t, dr2_t = curvature(x[keep], s[keep])
             u_rows.append({'Split seed': seed, 'Model': name, 'Feature': f, 'Expected': expected,
+                           'N measured': int(observed_mask.sum()),
                            'Curvature': a2, 'R2 gain (quadratic vs. linear)': dr2,
                            'Curvature (trimmed)': a2_t, 'R2 gain (trimmed)': dr2_t})
     r_rf, r_xgb = ranks['Random Forest'], ranks['XGBoost']
@@ -171,6 +177,7 @@ def share_expected(df_, col):
 u_rows_out = []
 for (model, feat), g in u_long.groupby(['Model', 'Feature']):
     u_rows_out.append({'Model': model, 'Feature': feat, 'Expected': g['Expected'].iloc[0],
+                       'Median n measured': g['N measured'].median(),
                        '% splits with expected curvature': share_expected(g, 'Curvature'),
                        'Median R2 gain': g['R2 gain (quadratic vs. linear)'].median(),
                        '% splits with expected curvature (trimmed)': share_expected(g, 'Curvature (trimmed)'),
@@ -192,7 +199,24 @@ for f in FEATURES:
     spread_rows.append({'Feature': f, 'SD potable': a.std(), 'SD not potable': b.std(),
                         'SD ratio (potable / not potable)': a.std() / b.std(),
                         'Brown-Forsythe p': stats.levene(a, b, center='median').pvalue})
-spread = pd.DataFrame(spread_rows).sort_values('SD ratio (potable / not potable)', ascending=False)
+spread = pd.DataFrame(spread_rows)
+
+
+def holm_adjust(p_values):
+    """Holm family-wise error correction; returns adjusted p-values in input order."""
+    p_values = np.asarray(p_values, dtype=float)
+    m = len(p_values)
+    order = np.argsort(p_values)
+    sorted_p = p_values[order]
+    adjusted_sorted = np.maximum.accumulate((m - np.arange(m)) * sorted_p)
+    adjusted_sorted = np.minimum(adjusted_sorted, 1.0)
+    adjusted = np.empty(m, dtype=float)
+    adjusted[order] = adjusted_sorted
+    return adjusted
+
+
+spread['Brown-Forsythe p (Holm-adjusted)'] = holm_adjust(spread['Brown-Forsythe p'].to_numpy())
+spread = spread.sort_values('SD ratio (potable / not potable)', ascending=False)
 spread.round(4).to_csv('paper_model_free_spread.csv', index=False)
 print('\n1. Spread of each feature by class (a ratio above 1 means potable samples are more spread out):')
 print(spread.round(3).to_string(index=False))
@@ -216,6 +240,8 @@ for f in FEATURES:
         miss_rows.append({'Feature': f, 'Missing n': int(m.sum()), 'Potable rate when missing': y[m].mean(),
                           'Potable rate when measured': y[~m].mean(), 'Chi-square p': stats.chi2_contingency(tab)[1]})
 miss = pd.DataFrame(miss_rows)
+if not miss.empty:
+    miss['Chi-square p (Holm-adjusted)'] = holm_adjust(miss['Chi-square p'].to_numpy())
 miss.round(4).to_csv('paper_model_free_missingness.csv', index=False)
 print('\n3. Is missingness informative about potability?')
 print(miss.round(3).to_string(index=False))
@@ -294,11 +320,12 @@ axes[1].set_title('(B)', loc='left')
 save_paper(fig, 'fig3_explanation_stability')
 
 
-def dependence_figure(sv, X_imp, name):
+def dependence_figure(sv, X_imp, X_observed, name):
     paper_rc()
     fig, axes = plt.subplots(2, 2, figsize=(180 * MM, 150 * MM), layout='constrained')
     for i, (ax, feat) in enumerate(zip(axes.flat, FOUR)):
-        shap.dependence_plot(feat, sv, X_imp, ax=ax, show=False, cmap=paper_cmap)
+        measured = X_observed[feat].to_numpy()
+        shap.dependence_plot(feat, sv[measured], X_imp.loc[measured], ax=ax, show=False, cmap=paper_cmap)
         ax.set_title(f'({chr(65 + i)}) {DISPLAY.get(feat, feat)}', loc='left')
     for a in fig.axes:
         a.tick_params(labelsize=8)

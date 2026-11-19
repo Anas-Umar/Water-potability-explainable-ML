@@ -6,6 +6,7 @@
 # What this script does:
 #   1. Exploratory data analysis (EDA), run before any modelling.
 #   2. Leakage-free preprocessing: median imputation is fit on training data
+#      only; XGBoost class weighting is recalculated within each CV training fold.
 #      only (inside a Pipeline for cross-validation, and on X_train only for
 #      the held-out test evaluation).
 #   3. Random Forest and XGBoost: 5-fold cross-validation on the training set,
@@ -108,7 +109,7 @@ print("Saved eda_class_balance.png")
 
 # 2.4 Correlation heatmap
 fig, ax = plt.subplots(figsize=(9, 7))
-corr = df.corr()
+corr = df[X.columns].corr()
 mask = np.triu(np.ones_like(corr, dtype=bool))
 sns.heatmap(corr, mask=mask, annot=True, fmt='.2f', cmap='coolwarm', center=0,
             square=True, linewidths=0.5, cbar_kws={'shrink': 0.8}, ax=ax)
@@ -119,7 +120,7 @@ plt.close()
 print("Saved eda_correlation_heatmap.png")
 
 # 2.5 Distributions by class (top-correlated-with-nothing, but informative) + boxplots
-df_melt = df.melt(id_vars='Potability', var_name='Feature', value_name='Value')
+df_melt = df.melt(id_vars='Potability', value_vars=X.columns, var_name='Feature', value_name='Value')
 df_melt['Potability'] = df_melt['Potability'].map({0: 'Not Potable', 1: 'Potable'})
 g = sns.FacetGrid(df_melt, col='Feature', col_wrap=3, sharey=False, sharex=False, height=3.2, aspect=1.1)
 g.map_dataframe(sns.boxplot, x='Potability', y='Value', hue='Potability',
@@ -143,7 +144,7 @@ for col in X.columns:
     print(f"  {col}: {n_outliers} ({outlier_summary[col]['pct']}%)")
 
 # 2.7 Multicollinearity check
-feature_corr = corr.drop(columns=['Potability']).drop(index=['Potability']).abs().to_numpy(copy=True)
+feature_corr = corr.abs().to_numpy(copy=True)
 np.fill_diagonal(feature_corr, 0)
 print(f"\nMax absolute pairwise correlation among features: {feature_corr.max():.3f}")
 
@@ -173,7 +174,7 @@ rf_cv = cross_validate(rf_pipeline, X_train, y_train, cv=skf, scoring=scoring)
 rf_pipeline.fit(X_train, y_train)  # imputer fit on X_train only
 rf_preds = rf_pipeline.predict(X_test)
 rf_proba = rf_pipeline.predict_proba(X_test)[:, 1]
-rf_cm = confusion_matrix(y_test, rf_preds)
+rf_cm = confusion_matrix(y_test, rf_preds, labels=[0, 1])
 
 print("\n--- Random Forest: 5-fold CV on training set (leakage-free) ---")
 for m in scoring:
@@ -213,20 +214,55 @@ ax.set_title('Confusion Matrix — Random Forest', fontsize=14, weight='bold')
 plt.tight_layout(); plt.savefig('rf_confusion_matrix.png', dpi=200); plt.close()
 print("Saved rf_roc_curve.png, rf_confusion_matrix.png")
 
-# ---- XGBoost (same leakage-free pattern) ----
+# ---- XGBoost (fold-aware class weighting) ----
+# The wrapper calculates scale_pos_weight from the y values passed to each
+# fit() call. During cross-validation these are the fold-training labels;
+# during final fitting they are the complete outer training labels.
+from sklearn.base import BaseEstimator, ClassifierMixin
+
+class FoldAwareXGBClassifier(ClassifierMixin, BaseEstimator):
+    def __init__(self, n_estimators=300, max_depth=5, learning_rate=0.05,
+                 random_state=RANDOM_STATE, eval_metric='logloss'):
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.learning_rate = learning_rate
+        self.random_state = random_state
+        self.eval_metric = eval_metric
+
+    def fit(self, X, y):
+        y_array = np.asarray(y)
+        n_negative = int(np.sum(y_array == 0))
+        n_positive = int(np.sum(y_array == 1))
+        if n_positive == 0 or n_negative == 0:
+            raise ValueError('Both classes must be present in each training fold.')
+        self.scale_pos_weight_ = n_negative / n_positive
+        self.model_ = xgb.XGBClassifier(
+            n_estimators=self.n_estimators,
+            max_depth=self.max_depth,
+            learning_rate=self.learning_rate,
+            scale_pos_weight=self.scale_pos_weight_,
+            random_state=self.random_state,
+            eval_metric=self.eval_metric,
+        )
+        self.model_.fit(X, y_array)
+        self.classes_ = self.model_.classes_
+        return self
+
+    def predict(self, X):
+        return self.model_.predict(X)
+
+    def predict_proba(self, X):
+        return self.model_.predict_proba(X)
+
 xgb_pipeline = Pipeline([
     ('imputer', SimpleImputer(strategy='median')),
-    ('model', xgb.XGBClassifier(
-        n_estimators=300, max_depth=5, learning_rate=0.05,
-        scale_pos_weight=(y_train == 0).sum() / (y_train == 1).sum(),
-        random_state=RANDOM_STATE, eval_metric='logloss'
-    ))
+    ('model', FoldAwareXGBClassifier(random_state=RANDOM_STATE))
 ])
 xgb_cv = cross_validate(xgb_pipeline, X_train, y_train, cv=skf, scoring=scoring)
 xgb_pipeline.fit(X_train, y_train)  # imputer fit on X_train only
 xgb_preds = xgb_pipeline.predict(X_test)
 xgb_proba = xgb_pipeline.predict_proba(X_test)[:, 1]
-xgb_cm = confusion_matrix(y_test, xgb_preds)
+xgb_cm = confusion_matrix(y_test, xgb_preds, labels=[0, 1])
 
 print("\n--- XGBoost: 5-fold CV on training set (leakage-free) ---")
 for m in scoring:
@@ -301,7 +337,7 @@ imputer_final = SimpleImputer(strategy='median').fit(X_train)
 X_test_imputed = pd.DataFrame(imputer_final.transform(X_test), columns=X.columns)
 
 if best_model_name == 'XGBoost':
-    explainer = shap.TreeExplainer(xgb_pipeline.named_steps['model'])
+    explainer = shap.TreeExplainer(xgb_pipeline.named_steps['model'].model_)
 else:
     explainer = shap.TreeExplainer(rf_pipeline.named_steps['model'])
 shap_values = explainer.shap_values(X_test_imputed)

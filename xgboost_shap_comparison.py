@@ -13,7 +13,8 @@
 #
 # Note: Random Forest SHAP values are on the probability scale and XGBoost SHAP
 # values are on the log-odds scale, so raw magnitudes are not comparable. The
-# comparison therefore uses each feature's share of the total, and its rank.
+# comparison therefore uses within-model shares and feature ranks. Shares describe
+# relative importance within each model; ranks are the primary cross-model comparison.
 #
 # Usage: place water_potability.csv in the same folder, then run
 #   pip install -r requirements.txt
@@ -30,6 +31,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
+from scipy.stats import spearmanr
 import xgboost as xgb
 import shap
 
@@ -95,15 +97,19 @@ xgb_shap = class1_shap(xgb_pipeline.named_steps['model'])
 rf_mean = pd.Series(np.abs(rf_shap).mean(axis=0), index=X.columns)
 xgb_mean = pd.Series(np.abs(xgb_shap).mean(axis=0), index=X.columns)
 table = pd.DataFrame({
-    'RF share of total (%)': rf_mean / rf_mean.sum() * 100,
-    'XGBoost share of total (%)': xgb_mean / xgb_mean.sum() * 100,
+    # Raw values are retained for within-model reference only. They must not
+    # be compared directly across models because the SHAP output scales differ.
+    'RF mean |SHAP| (RF output scale)': rf_mean,
+    'XGBoost mean |SHAP| (XGB output scale)': xgb_mean,
+    'RF share of model total (%)': rf_mean / rf_mean.sum() * 100,
+    'XGBoost share of model total (%)': xgb_mean / xgb_mean.sum() * 100,
 })
-table['RF rank'] = table['RF share of total (%)'].rank(ascending=False).astype(int)
-table['XGBoost rank'] = table['XGBoost share of total (%)'].rank(ascending=False).astype(int)
+table['RF rank'] = table['RF share of model total (%)'].rank(ascending=False, method='average').astype(int)
+table['XGBoost rank'] = table['XGBoost share of model total (%)'].rank(ascending=False, method='average').astype(int)
 table = table.sort_values('RF rank')
 table.round(1).to_csv('shap_importance_rf_vs_xgboost.csv')
 
-spearman = np.corrcoef(table['RF rank'], table['XGBoost rank'])[0, 1]
+spearman = spearmanr(table['RF rank'], table['XGBoost rank']).statistic
 print('\nSHAP importance, Random Forest vs. XGBoost (test set):')
 print(table.round(1).to_string())
 print(f'\nSpearman rank correlation between the two rankings: {spearman:.2f}')
@@ -111,15 +117,15 @@ print('Top 3 Random Forest:', list(table.sort_values("RF rank").index[:3]))
 print('Top 3 XGBoost:      ', list(table.sort_values("XGBoost rank").index[:3]))
 
 # ---------------- Figure 1: ranking comparison (grouped bars) ----------------
-plot_df = table.sort_values('RF share of total (%)', ascending=True)
+plot_df = table.sort_values('RF share of model total (%)', ascending=True)
 fig, ax = plt.subplots(figsize=(8.5, 5.8))
 pos = np.arange(len(plot_df))
 h = 0.38
-ax.barh(pos - h / 2, plot_df['RF share of total (%)'], height=h, color=PALETTE['rf'], label='Random Forest')
-ax.barh(pos + h / 2, plot_df['XGBoost share of total (%)'], height=h, color=PALETTE['xgb'], label='XGBoost')
+ax.barh(pos - h / 2, plot_df['RF share of model total (%)'], height=h, color=PALETTE['rf'], label='Random Forest')
+ax.barh(pos + h / 2, plot_df['XGBoost share of model total (%)'], height=h, color=PALETTE['xgb'], label='XGBoost')
 ax.set_yticks(pos)
 ax.set_yticklabels(plot_df.index)
-ax.set_xlabel('Share of total mean |SHAP value| (%)')
+ax.set_xlabel('Within-model share of total mean |SHAP value| (%)')
 ax.set_title('SHAP Feature Importance: Random Forest vs. XGBoost', fontsize=14, pad=12)
 ax.legend(loc='lower right', frameon=False)
 ax.grid(axis='x', alpha=0.4)

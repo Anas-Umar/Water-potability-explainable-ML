@@ -24,7 +24,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from sklearn.base import clone
+from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.model_selection import (train_test_split, StratifiedKFold,
                                      RandomizedSearchCV, cross_val_predict)
 from sklearn.ensemble import RandomForestClassifier
@@ -35,6 +35,53 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import (roc_auc_score, recall_score, precision_score, f1_score,
                              roc_curve, precision_recall_curve, average_precision_score)
 import xgboost as xgb
+
+
+class FoldBalancedXGBClassifier(ClassifierMixin, BaseEstimator):
+    """XGBoost classifier that estimates scale_pos_weight from each fit's y only.
+
+    This makes the class-weight ratio fold-specific during cross-validation,
+    rather than calculating it once from the complete outer training set.
+    """
+    def __init__(self, n_estimators=300, max_depth=5, learning_rate=0.05,
+                 subsample=1.0, colsample_bytree=1.0, min_child_weight=1,
+                 random_state=42,
+                 eval_metric='logloss', n_jobs=None):
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.learning_rate = learning_rate
+        self.subsample = subsample
+        self.colsample_bytree = colsample_bytree
+        self.min_child_weight = min_child_weight
+        self.random_state = random_state
+        self.eval_metric = eval_metric
+        self.n_jobs = n_jobs
+
+    def fit(self, X, y, **fit_params):
+        y_arr = np.asarray(y)
+        n_negative = int(np.sum(y_arr == 0))
+        n_positive = int(np.sum(y_arr == 1))
+        if n_positive == 0 or n_negative == 0:
+            raise ValueError('Both classes must be present when fitting XGBoost.')
+        self.scale_pos_weight_ = n_negative / n_positive
+        self.classes_ = np.unique(y_arr)
+        self.model_ = xgb.XGBClassifier(
+            n_estimators=self.n_estimators, max_depth=self.max_depth,
+            learning_rate=self.learning_rate, subsample=self.subsample,
+            colsample_bytree=self.colsample_bytree,
+            min_child_weight=self.min_child_weight,
+            scale_pos_weight=self.scale_pos_weight_,
+            random_state=self.random_state, eval_metric=self.eval_metric,
+            n_jobs=self.n_jobs)
+        self.model_.fit(X, y_arr, **fit_params)
+        return self
+
+    def predict(self, X):
+        return self.model_.predict(X)
+
+    def predict_proba(self, X):
+        return self.model_.predict_proba(X)
+
 
 QUICK = '--quick' in sys.argv
 SEED = 42
@@ -68,9 +115,8 @@ y_arr = y_test.to_numpy()
 n_test = len(y_arr)
 
 
-def make_models(y_tr):
-    """The three models: thesis settings for the ensembles, plus a simple baseline."""
-    spw = (y_tr == 0).sum() / (y_tr == 1).sum()
+def make_models():
+    """The three models; XGBoost recalculates class weighting inside every fit."""
     return {
         'Logistic regression': Pipeline([
             ('imputer', SimpleImputer(strategy='median')), ('scaler', StandardScaler()),
@@ -80,8 +126,8 @@ def make_models(y_tr):
             ('model', RandomForestClassifier(n_estimators=300, class_weight='balanced', random_state=SEED))]),
         'XGBoost': Pipeline([
             ('imputer', SimpleImputer(strategy='median')),
-            ('model', xgb.XGBClassifier(n_estimators=300, max_depth=5, learning_rate=0.05,
-                                        scale_pos_weight=spw, random_state=SEED, eval_metric='logloss'))]),
+            ('model', FoldBalancedXGBClassifier(n_estimators=300, max_depth=5, learning_rate=0.05,
+                                                random_state=SEED, eval_metric='logloss'))]),
     }
 
 
@@ -95,7 +141,7 @@ def metrics(y_true, p, thr=0.5):
 
 
 # ---------------- 0. Fit the three models on the training set ----------------
-models = make_models(y_train)
+models = make_models()
 probs = {}
 for name, pipe in models.items():
     pipe.fit(X_train, y_train)
@@ -125,21 +171,19 @@ diff_rows = []
 for a, b_ in pairs:
     for col in boot[a].columns:
         d = boot[a][col].to_numpy() - boot[b_][col].to_numpy()
-        p_two = min(1.0, 2 * min((d <= 0).mean(), (d >= 0).mean()))
         diff_rows.append({'Comparison': f'{a} minus {b_}', 'Metric': col,
                           'Difference': observed.loc[a, col] - observed.loc[b_, col],
-                          'CI low': np.quantile(d, 0.025), 'CI high': np.quantile(d, 0.975),
-                          'Approx. two-sided p': p_two})
+                          'CI low': np.quantile(d, 0.025), 'CI high': np.quantile(d, 0.975)})
 diffs = pd.DataFrame(diff_rows)
 diffs.round(3).to_csv('paper_paired_differences.csv', index=False)
-print('\nPaired bootstrap differences:')
+print('\nPaired bootstrap differences (95% percentile intervals; no bootstrap p-values reported):')
 print(diffs.round(3).to_string(index=False))
 
 # ---------------- 2. Repeated random splits ----------------
 split_rows = []
 for s in range(N_SPLITS):
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, stratify=y, random_state=1000 + s)
-    for name, pipe in make_models(ytr).items():
+    for name, pipe in make_models().items():
         pipe.fit(Xtr, ytr)
         r = metrics(yte.to_numpy(), pipe.predict_proba(Xte)[:, 1])
         r.update({'Split seed': 1000 + s, 'Model': name})
@@ -221,7 +265,9 @@ axes[1].legend(loc='upper right', frameon=False, fontsize=8.5)
 plt.tight_layout(); plt.savefig('paper_roc_pr_panel.png', dpi=200); plt.close()
 
 # ---------------- 6. Cost analysis (thresholds chosen on training data only) ----------------
-thr_grid = np.linspace(0.02, 0.98, 97)
+# Candidate cut-points are derived only from training OOF predictions.
+# This avoids the coarse 0.01 grid while keeping the test set out of threshold selection.
+thr_grid = None
 
 
 def errors(y_true, p, t):
@@ -237,10 +283,13 @@ y_tr_arr = y_train.to_numpy()
 
 cost_rows = []
 for name in cost_models:
+    # Include all unique training OOF scores and endpoints, so threshold selection
+    # is not restricted to a coarse, arbitrary 0.01 grid.
+    thr_grid = np.unique(np.r_[0.0, oof[name], np.nextafter(1.0, np.inf)])
     for r in COST_RATIOS:
-        oof_cost = [(r * errors(y_tr_arr, oof[name], t)[0] + errors(y_tr_arr, oof[name], t)[1]) / len(y_tr_arr)
-                    for t in thr_grid]
-        t_star = thr_grid[int(np.argmin(oof_cost))]
+        oof_cost = np.array([(r * errors(y_tr_arr, oof[name], t)[0] + errors(y_tr_arr, oof[name], t)[1]) / len(y_tr_arr)
+                             for t in thr_grid])
+        t_star = float(thr_grid[int(np.argmin(oof_cost))])
         fp5, fn5 = errors(y_arr, probs[name], 0.5)
         fps, fns = errors(y_arr, probs[name], t_star)
         pred_star = probs[name] >= t_star
@@ -276,11 +325,12 @@ print('\nLowest test cost at each cost ratio (thresholds from training CV), agai
 print('policies (reject all water, accept all water). A model only adds value if the gain is clearly above zero:')
 print(best.round(3).to_string(index=False))
 
+display_thr_grid = np.linspace(0.0, 1.0, 201)
 fig, axes = plt.subplots(1, 3, figsize=(14, 4.3), sharey=False)
 for ax, r in zip(axes, [1, 5, 20]):
     for name, p in probs.items():
-        c = [(r * errors(y_arr, p, t)[0] + errors(y_arr, p, t)[1]) / n_test for t in thr_grid]
-        ax.plot(thr_grid, c, color=COLORS[name], lw=2, label=name)
+        c = [(r * errors(y_arr, p, t)[0] + errors(y_arr, p, t)[1]) / n_test for t in display_thr_grid]
+        ax.plot(display_thr_grid, c, color=COLORS[name], lw=2, label=name)
     ax.axvline(0.5, ls=':', color=PALETTE['muted'])
     ax.axhline(n_pot / n_test, ls='--', color='#c0392b', lw=1.2, label='Reject all water')
     ax.set(xlabel='Decision threshold (probability of potable)', title=f'Cost ratio {r}:1')
@@ -344,8 +394,8 @@ save_paper(fig, 'fig1_roc_pr')
 fig, axes = plt.subplots(1, 3, figsize=(180 * MM, 76 * MM), layout='constrained')
 for i, (ax, r, ylim) in enumerate(zip(axes, [1, 5, 20], [(0.30, 0.64), (0.30, 2.0), (0.30, 2.0)])):
     for name, p in probs.items():
-        c = [(r * errors(y_arr, p, t)[0] + errors(y_arr, p, t)[1]) / n_test for t in thr_grid]
-        ax.plot(thr_grid, c, color=PAPER_COLORS[name], ls=PAPER_LINES[name], label=name)
+        c = [(r * errors(y_arr, p, t)[0] + errors(y_arr, p, t)[1]) / n_test for t in display_thr_grid]
+        ax.plot(display_thr_grid, c, color=PAPER_COLORS[name], ls=PAPER_LINES[name], label=name)
     ax.axvline(0.5, color='#999999', ls=':')
     ax.axhline(n_pot / n_test, color='black', ls='-.', label='Reject all water')
     ax.set_ylim(*ylim)
