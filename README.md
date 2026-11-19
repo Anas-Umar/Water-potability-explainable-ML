@@ -2,99 +2,74 @@
 
 [![DOI](https://zenodo.org/badge/1418388413.svg)](https://doi.org/10.5281/zenodo.23495833)
 
-This code accompanies the M.Tech. thesis *An Explainable Machine Learning Approach to Water Potability Prediction* by Anas Umar Aliyu, Mewar University, India. It also reproduces the analyses of a research paper based on the thesis.
+This repository accompanies the M.Tech. thesis *An Explainable Machine Learning Approach to Water Potability Prediction* by Anas Umar Aliyu, Mewar University, India, and related manuscript analyses.
 
-The code trains Random Forest and XGBoost classifiers on the Kaggle Water Potability dataset, compares them, and explains them with SHAP, permutation importance and native feature importance. Preprocessing is leakage-free: median imputation sits inside a scikit-learn `Pipeline`, so it is fit on training data only.
+The project evaluates Random Forest (RF) and XGBoost classifiers on the public Kaggle Water Potability dataset and examines model explanations using SHAP, permutation importance, and native model importance.
 
-## Data
+## Dataset
 
-The dataset is not included in this repository. Download `water_potability.csv` from Kaggle and place it in the same folder as the scripts:
-
-<https://www.kaggle.com/datasets/adityakadiwal/water-potability>
-
-The dataset has 3,276 samples, 9 physicochemical parameters, and a binary `Potability` label (0 or 1). Its original collection method is not documented (see Chapter 3 of the thesis).
+Download `water_potability.csv` from [Kaggle](https://www.kaggle.com/datasets/adityakadiwal/water-potability). The dataset is not redistributed here. It contains 3,276 samples, nine physicochemical predictors, and a binary `Potability` label. The original sampling and collection process is not documented.
 
 ## Scripts
 
-Each script is self-contained and can be run on its own.
-
-| Script | What it does |
+| Script | Purpose |
 |---|---|
-| `water_potability_full_analysis_v2.py` | Data loading, exploratory data analysis, leakage-free preprocessing, Random Forest and XGBoost training, 5-fold cross-validation on the training set, test-set evaluation, model comparison, and SHAP. Prints the numbers used in Tables 3.1, 3.2, 4.1, 4.2 and 4.3 of the thesis. |
-| `supplementary_eda_and_importance.py` | The thesis exploratory figures, Random Forest permutation and native importance, and the combined confusion matrix panel. |
-| `regenerate_themed_plots.py` | The ROC comparison plot and the SHAP summary, bar and dependence plots in the thesis style. |
-| `xgboost_shap_comparison.py` | SHAP for XGBoost, compared with the Random Forest feature ranking. |
-| `paper_performance_analyses.py` | Paper analyses: bootstrap confidence intervals, paired differences, repeated splits, label shuffling, equal-budget tuning, cost analysis, and Figures 1 and 2. |
-| `paper_explanation_stability.py` | Paper analyses: SHAP rank stability over 21 splits, agreement between models, shape of the dependence curves, checks on the raw data, and Figures 3 to 5 and S1. |
+| `water_potability_full_analysis_v2.py` | EDA, leakage-aware preprocessing, RF/XGBoost modelling, cross-validation, test evaluation, and RF SHAP analysis |
+| `supplementary_eda_and_importance.py` | Supplementary EDA figures, RF permutation/native importance, and confusion-matrix visualisation |
+| `regenerate_themed_plots.py` | Regenerates thesis-style ROC and RF SHAP plots |
+| `xgboost_shap_comparison.py` | XGBoost SHAP explanations and comparison with RF feature rankings |
+| `paper_performance_analyses.py` | Bootstrap uncertainty, paired comparisons, repeated splits, label-shuffling, tuning, and cost-sensitive analyses |
+| `paper_explanation_stability.py` | Explanation-rank stability, cross-model agreement, dependence-curve patterns, and raw-data checks |
 
-## Thesis figures and the scripts that produce them
+The `original_scripts/` directory preserves the versions that were previously present at the repository root. The root scripts are intended to contain the consolidated versions. Audit notes and representative outputs are provided in the accompanying package.
 
-| Figure | File | Script |
-|---|---|---|
-| 3.2 | `eda_overview_combined.png` | `supplementary_eda_and_importance.py` |
-| 3.3 | `eda_correlation_heatmap_v2.png` | `supplementary_eda_and_importance.py` |
-| 3.4 | `eda_boxplots_by_class_v2.png` | `supplementary_eda_and_importance.py` |
-| 4.1 | `confusion_matrices_combined.png` | `supplementary_eda_and_importance.py` |
-| 4.2 | `model_comparison_roc_v2.png` | `regenerate_themed_plots.py` |
-| 4.3 | `shap_summary_plot_v2.png` | `regenerate_themed_plots.py` |
-| 4.4 | `shap_bar_plot_v2.png` | `regenerate_themed_plots.py` |
-| 4.5 | `rf_importance_comparison_v2.png` | `supplementary_eda_and_importance.py` |
-| 4.6 | `shap_rf_vs_xgboost_share.png` | `xgboost_shap_comparison.py` |
-| 4.7 | `shap_dependence_grid_v2.png` | `regenerate_themed_plots.py` |
-| B.1 | `shap_dependence_grid_xgboost.png` | `xgboost_shap_comparison.py` |
-| B.2 | `shap_summary_plot_xgboost_v2.png` | `xgboost_shap_comparison.py` |
+## Main analysis results
 
-Figure 3.1 (the pipeline diagram) is a schematic and is not generated by these scripts.
+In the reported Google Colab run (Python 3.13.18; package versions listed in `requirements.txt`):
 
-## Paper figures and tables
+| Model | Training CV ROC-AUC (mean) | Test ROC-AUC |
+|---|---:|---:|
+| Random Forest | 0.6909 | 0.6611 |
+| XGBoost | 0.6611 | 0.6347 |
 
-Figures are saved as a vector `.pdf` and a 300 dpi RGB `.tiff`, 180 mm wide.
+Random Forest was selected for the primary SHAP analysis because it had the higher training cross-validation ROC-AUC. The difference should not be described as definitive model superiority: the paired test-set AUC difference was small and its confidence interval was approximately -0.000 to 0.055.
 
-| Item | File | Script |
-|---|---|---|
-| Figure 1 (ROC and precision-recall) | `fig1_roc_pr` | `paper_performance_analyses.py` |
-| Figure 2 (cost curves) | `fig2_cost_curves` | `paper_performance_analyses.py` |
-| Figure 3 (explanation stability) | `fig3_explanation_stability` | `paper_explanation_stability.py` |
-| Figure 4 (Random Forest dependence plots) | `fig4_dependence_random_forest` | `paper_explanation_stability.py` |
-| Figure 5 (raw-data deciles) | `fig5_raw_data_deciles` | `paper_explanation_stability.py` |
-| Figure S1 (XGBoost dependence plots) | `figS1_dependence_xgboost` | `paper_explanation_stability.py` |
-| Table 1 (metrics with intervals) | `paper_bootstrap_ci.csv` | `paper_performance_analyses.py` |
-| Table 2 (cost analysis) | `paper_cost_analysis.csv` | `paper_performance_analyses.py` |
-| Table 3 (rank stability) | `paper_shap_rank_stability.csv` | `paper_explanation_stability.py` |
-| Table 4 (curve shapes) | `paper_u_shape_summary.csv` | `paper_explanation_stability.py` |
+The test results also show a trade-off in potable-water detection. RF had potable-class recall of approximately 0.293, while XGBoost had approximately 0.477. These results do not establish a sufficiently reliable stand-alone water-safety screening system.
 
-## How to run
+Feature-importance comparisons consistently placed Sulfate and pH among the leading predictors, with Hardness also ranking highly. These are explanations of model behaviour, not evidence of causal effects or proof of drinking-water safety.
 
-In Google Colab:
+## Reproducibility
 
-```
+- Main split: stratified 80/20 train/test split; random seed 42.
+- Cross-validation: stratified five-fold CV on the training data.
+- Missing values: median imputation within scikit-learn pipelines to avoid fitting preprocessing on the held-out test data.
+- Reported environment: Python 3.13.18, pandas 2.2.3, NumPy 2.1.3, scikit-learn 1.6.1, XGBoost 3.4.1, SHAP 0.52.0, matplotlib 3.10.0, seaborn 0.13.2, SciPy 1.16.3, Pillow 11.3.0.
+- Use `requirements.txt` to install the pinned dependencies.
+
+### Run in Google Colab
+
+```bash
 !git clone https://github.com/Anas-Umar/Water-potability-explainable-ML.git
 %cd Water-potability-explainable-ML
 !pip install -r requirements.txt
 ```
 
-Upload `water_potability.csv` to the same folder, then run any script, for example:
+Upload `water_potability.csv` into the working directory, then run the required script:
 
-```
+```bash
 !python water_potability_full_analysis_v2.py
-!python paper_performance_analyses.py
 ```
 
-The two paper scripts also accept `--quick`, which uses small settings for testing only (about a minute each). A full run of `paper_performance_analyses.py` takes roughly 10 to 20 minutes, and of `paper_explanation_stability.py` roughly 5 to 10.
+Each supplementary script can be run separately. The paper analysis scripts may take longer than the main analysis.
 
-Locally, run `pip install -r requirements.txt`, then run each script with `python`.
+## Evidence and limitations
 
-## Reproducibility
+Execution results reported by the author from Google Colab were reviewed during preparation of this repository update. This is not an independent third-party reproduction. The full Colab notebook/session and complete generated output directory are not archived here. Results may vary with library versions, platform, or execution settings.
 
-- Fixed random seed 42 for the main train/test split, the cross-validation folds and the models. The paper scripts also use seeds 1000 to 1019 (repeated performance splits) and 2000 to 2019 (repeated explanation splits).
-- Split: 80/20, stratified. Cross-validation: 5-fold, stratified, run on the training set only.
-- Imputation: median, inside a `Pipeline`, refit on the training portion only.
-- Paper analyses: 2,000 bootstrap resamples of the test set and 200 label shuffles.
-- Environment used for the results: Python 3.13.18, pandas 2.2.3, numpy 2.1.3, scikit-learn 1.6.1, xgboost 3.4.1, shap 0.52.0, matplotlib 3.10.0, seaborn 0.13.2, scipy 1.16.3, pillow 11.3.0 (Google Colab). The thesis results were first produced under Python 3.13.16 and reproduced identically under 3.13.18. Each paper script prints its environment at the end.
-- Other library versions may give slightly different numbers, especially for XGBoost and SHAP.
+The dataset's undocumented provenance, class imbalance, and modest test performance limit the conclusions that can be drawn. The models should not be used as substitutes for laboratory testing or regulatory water-quality assessment.
 
 ## Citation and licence
 
-If you use this code, please cite the thesis: Aliyu, A. U. (2026). *An Explainable Machine Learning Approach to Water Potability Prediction* [M.Tech. thesis]. Mewar University.
+Aliyu, A. U. (2026). *An Explainable Machine Learning Approach to Water Potability Prediction* [M.Tech. thesis]. Mewar University.
 
-Licence: MIT. See the [LICENSE](LICENSE) file.
+See [LICENSE](LICENSE) for licence terms.
