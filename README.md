@@ -84,19 +84,60 @@ Feature-importance comparisons consistently placed Sulfate and pH among the lead
 
 ### Run in Google Colab
 
+Clone the repository, install the pinned dependencies, and upload `water_potability.csv` to the repository working directory:
+
 ```bash
 !git clone https://github.com/Anas-Umar/Water-potability-explainable-ML.git
 %cd Water-potability-explainable-ML
 !pip install -r requirements.txt
 ```
 
-Upload `water_potability.csv` into the working directory, then run the required script:
+Run the scripts individually, as needed:
+
+**1. Main analysis — data preparation, model training, evaluation and Random Forest SHAP**
 
 ```bash
 !python water_potability_full_analysis_v2.py
 ```
 
-Each supplementary script can be run separately. The paper analysis scripts may take longer than the main analysis.
+**2. Supplementary EDA and Random Forest feature importance**
+
+```bash
+!python supplementary_eda_and_importance.py
+```
+
+**3. Regenerate thesis-style ROC and Random Forest SHAP plots**
+
+```bash
+!python regenerate_themed_plots.py
+```
+
+**4. XGBoost SHAP analysis and comparison with Random Forest**
+
+```bash
+!python xgboost_shap_comparison.py
+```
+
+**5. Paper performance, uncertainty, tuning and cost analyses**
+
+```bash
+!python paper_performance_analyses.py
+```
+
+**6. Paper explanation-stability and dependence analyses**
+
+```bash
+!python paper_explanation_stability.py
+```
+
+The two paper-analysis scripts also support a quicker test run using `--quick`; this is intended for checking that the script runs, not for reporting final research results:
+
+```bash
+!python paper_performance_analyses.py --quick
+!python paper_explanation_stability.py --quick
+```
+
+Each script can be run independently after the dataset and dependencies are in place. Run only the analyses you need; the supplementary scripts are not required to execute the main analysis.
 
 ## Evidence and limitations
 
