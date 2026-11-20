@@ -4,7 +4,7 @@ This is a separate audit copy. The original supplementary_eda_and_importance.py
 is intentionally left unchanged.
 
 Run from any working directory:
-    python supplementary_eda_and_importance_corrected.py
+    python supplementary_eda_and_importance.py
 The CSV is expected beside this script. Outputs are saved beside this script.
 """
 from pathlib import Path
