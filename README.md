@@ -90,9 +90,12 @@ Clone the repository, install the pinned dependencies, and upload `water_potabil
 !git clone https://github.com/Anas-Umar/Water-potability-explainable-ML.git
 %cd Water-potability-explainable-ML
 !pip install -r requirements.txt
+
+from google.colab import files
+files.upload()
 ```
 
-Run the scripts individually, as needed:
+Upload water_potability.csv or any given dataset Run the scripts individually, as needed:
 
 **1. Main analysis — data preparation, model training, evaluation and Random Forest SHAP**
 
