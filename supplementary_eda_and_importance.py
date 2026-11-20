@@ -1,7 +1,7 @@
 """Corrected supplementary EDA and feature-importance analysis.
 
-This is a separate audit copy. The original supplementary_eda_and_importance.py
-is intentionally left unchanged.
+Generates corrected exploratory figures, Random Forest importance outputs,
+and model confusion matrices.
 
 Run from any working directory:
     python supplementary_eda_and_importance.py
