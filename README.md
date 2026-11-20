@@ -2,7 +2,7 @@
 
 [![DOI](https://zenodo.org/badge/1418388413.svg)](https://doi.org/10.5281/zenodo.23495833)
 
-This repository accompanies the M.Tech. thesis *An Explainable Machine Learning Approach to Water Potability Prediction* by Anas Umar Aliyu, Mewar University, India, and related manuscript analyses.
+This repository accompanies the M.Tech. thesis *An Explainable Machine Learning Approach to Water Potability Prediction* by Anas Umar Aliyu, Mewar University, India, and the research manuscript *Explanation Stability and Decision Value of Random Forest and XGBoost for Water Potability Prediction: A Benchmark Study*.
 
 The project evaluates Random Forest (RF) and XGBoost classifiers on the public Kaggle Water Potability dataset and examines model explanations using SHAP, permutation importance, and native model importance.
 
