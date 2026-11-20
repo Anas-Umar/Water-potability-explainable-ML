@@ -21,20 +21,20 @@ Download `water_potability.csv` from [Kaggle](https://www.kaggle.com/datasets/ad
 | `paper_performance_analyses.py` | Bootstrap uncertainty, paired comparisons, repeated splits, label-shuffling, tuning, and cost-sensitive analyses |
 | `paper_explanation_stability.py` | Explanation-rank stability, cross-model agreement, dependence-curve patterns, and raw-data checks |
 
-The `original_scripts/` directory preserves the versions that were previously present at the repository root. The root scripts are intended to contain the consolidated versions. Audit notes and representative outputs are provided in the accompanying package.
+The six scripts at the repository root are the consolidated analysis scripts. Earlier script versions are not included in this repository. Audit notes and representative outputs are provided in the accompanying package.
 
 ## Thesis figures and the scripts that produce them
 
 | Figure | Output file | Generating script |
 |---|---|---|
-| 3.2 | `eda_overview_combined.png` | `supplementary_eda_and_importance.py` |
-| 3.3 | `eda_correlation_heatmap_v2.png` | `supplementary_eda_and_importance.py` |
-| 3.4 | `eda_boxplots_by_class_v2.png` | `supplementary_eda_and_importance.py` |
-| 4.1 | `confusion_matrices_combined.png` | `supplementary_eda_and_importance.py` |
+| 3.2 | `eda_overview_combined_corrected.png` | `supplementary_eda_and_importance.py` |
+| 3.3 | `eda_correlation_heatmap_corrected.png` | `supplementary_eda_and_importance.py` |
+| 3.4 | `eda_boxplots_by_class_corrected.png` | `supplementary_eda_and_importance.py` |
+| 4.1 | `confusion_matrices_combined_corrected.png` | `supplementary_eda_and_importance.py` |
 | 4.2 | `model_comparison_roc_v2.png` | `regenerate_themed_plots.py` |
 | 4.3 | `shap_summary_plot_v2.png` | `regenerate_themed_plots.py` |
 | 4.4 | `shap_bar_plot_v2.png` | `regenerate_themed_plots.py` |
-| 4.5 | `rf_importance_comparison_v2.png` | `supplementary_eda_and_importance.py` |
+| 4.5 | `rf_importance_rank_comparison_corrected.png` | `supplementary_eda_and_importance.py` |
 | 4.6 | `shap_rf_vs_xgboost_share.png` | `xgboost_shap_comparison.py` |
 | 4.7 | `shap_dependence_grid_v2.png` | `regenerate_themed_plots.py` |
 | B.1 | `shap_dependence_grid_xgboost.png` | `xgboost_shap_comparison.py` |
@@ -95,7 +95,7 @@ from google.colab import files
 files.upload()
 ```
 
-Upload water_potability.csv or any given dataset Run the scripts individually, as needed:
+Upload `water_potability.csv` to the repository working directory, then run the scripts individually as needed:
 
 **1. Main analysis — data preparation, model training, evaluation and Random Forest SHAP**
 
