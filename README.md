@@ -21,7 +21,7 @@ Download `water_potability.csv` from [Kaggle](https://www.kaggle.com/datasets/ad
 | `paper_performance_analyses.py` | Bootstrap uncertainty, paired comparisons, repeated splits, label-shuffling, tuning, and cost-sensitive analyses |
 | `paper_explanation_stability.py` | Explanation-rank stability, cross-model agreement, dependence-curve patterns, and raw-data checks |
 
-The six scripts at the repository root are the consolidated analysis scripts. Earlier script versions are not included in this repository. Audit notes and representative outputs are provided in the accompanying package.
+The six scripts at the repository root are the consolidated analysis scripts. Earlier script versions are not included in this repository. The audit notes are documented in `ENVIRONMENT_AUDIT.md` and `REPRODUCIBILITY_STATUS.md`; generated figures and tables can be recreated by running the relevant scripts.
 
 ## Thesis figures and the scripts that produce them
 
